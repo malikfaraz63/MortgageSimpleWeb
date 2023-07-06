@@ -179,6 +179,23 @@ const button = document.getElementById("signInButton");
 const reloadDataButton = document.getElementById("reloadDataButton");
 dashboardView.hidden = true;
 
+function showAlert(type, title, message) {
+    console.log("SOmething happened");
+    const mainView = document.getElementById("mainView");
+    const alert = document.createElement('div')
+    alert.innerHTML = `
+    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+        <p><strong>${title}</strong></p>
+        <p>${message}</p>
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+        <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+    `;
+
+    mainView.insertAdjacentElement('beforeend', alert);
+}
+
 function clearData() {
     document.getElementById("leadsTable").innerHTML = "";
     if (myChart) {
@@ -189,7 +206,7 @@ function clearData() {
     }
 }
 
-function reloadData() {
+function loadData() {
     fetchMortgageStats()
         .then(mortgagesData => {
             dashboardView.hidden = false;
@@ -205,9 +222,9 @@ function reloadData() {
         .then(showRecentLeads);
 }
 
-reloadDataButton.addEventListener('click', () => { 
-    clearData(); 
-    reloadData(); 
+reloadDataButton.addEventListener('click', () => {
+    clearData();
+    loadData();
 });
 
 button.addEventListener('click', () => {
@@ -224,8 +241,12 @@ button.addEventListener('click', () => {
     } else {
         auth.signInWithPopup(provider)
             .then((result) => {
+                button.className = "btn btn-link align-items-center gap-2";
                 reloadDataButton.className = "btn btn-link align-items-center gap-2";
-                reloadData();
+                loadData();
+            }).catch((error) => {
+                button.className = "btn btn-link align-items-center gap-2";
+                showAlert('warning', "Login Failed", error.message);
             });
         userSignedIn = true;
         button.className = "btn btn-link align-items-center gap-2 disabled";
