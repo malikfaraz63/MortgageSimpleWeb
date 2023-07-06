@@ -21,6 +21,8 @@ function fetchMortgageStats() {
             currentCountQuery.get()
                 .then(querySnapshot => {
                     mortgagesData.splice(i, 0, querySnapshot.size);
+                }).catch(error => {
+                    reject(error);
                 });
         }
         const finalCountQuery = db.collectionGroup('mortgages')
@@ -29,6 +31,9 @@ function fetchMortgageStats() {
             .then(querySnapshot => {
                 mortgagesData.splice(slices, 0, querySnapshot.size);
                 resolve(mortgagesData);
+            })
+            .catch(error => {
+                reject(error);
             });
     });
 }
@@ -90,10 +95,10 @@ function getLeadRow(lead) {
     let start = lead.start.toDate();
     leadRow.innerHTML = `
     <tr>
-        <td>£${lead.loan.toLocaleString('en-GB')}</td>
+        <td>£${lead.loan.toLocaleString('en-US')}</td>
         <td>${lead.lender}</td>
         <td>${(lead.rate * 100).toFixed(2)}%</td>
-        <td>£${lead.rent.toLocaleString('en-GB')}</td>
+        <td>£${lead.rent.toLocaleString('en-US')}</td>
         <td>${start.getDate()} ${monthNames[start.getMonth()]} ${start.getFullYear()}</td> 
         <td>${lead.term} yrs</td>
         <td>
@@ -116,6 +121,8 @@ function fetchUser(userID) {
         userQuery.get()
             .then(user => {
                 resolve(user.data());
+            }).catch(error => {
+                reject(error);
             });
     });
 }
@@ -179,9 +186,14 @@ const button = document.getElementById("signInButton");
 const reloadDataButton = document.getElementById("reloadDataButton");
 dashboardView.hidden = true;
 
+/**
+ * 
+ * @param {string} type 
+ * @param {string} title 
+ * @param {string} message 
+ */
 function showAlert(type, title, message) {
-    console.log("SOmething happened");
-    const mainView = document.getElementById("mainView");
+    const alertView = document.getElementById("alertView");
     const alert = document.createElement('div')
     alert.innerHTML = `
     <div class="alert alert-${type} alert-dismissible fade show" role="alert">
@@ -193,29 +205,49 @@ function showAlert(type, title, message) {
     </div>
     `;
 
-    mainView.insertAdjacentElement('beforeend', alert);
+    alertView.insertAdjacentElement('beforeend', alert);
 }
 
-function clearData() {
+/**
+ * 
+ * @param {boolean} isLogout 
+ */
+function clearData(isLogout) {
     document.getElementById("leadsTable").innerHTML = "";
+    document.getElementById("alertView").innerHTML = "";
     if (myChart) {
         myChart.destroy();
     }
-    for (let i = 0; i < menuItems.length; i++) {
-        menuList.removeChild(menuList.children[0]);
+    if (isLogout) {
+        let removalLength = menuList.children.length - 1;
+        for (let i = 0; i < removalLength; i++) {
+            menuList.removeChild(menuList.children[0]);
+        }
     }
 }
 
-function loadData() {
+/**
+ * 
+ * @param {boolean} isLogin 
+ */
+function loadData(isLogin) {
     fetchMortgageStats()
         .then(mortgagesData => {
             dashboardView.hidden = false;
             button.className = "btn btn-link align-items-center gap-2";
+            reloadDataButton.className = "btn btn-link align-items-center gap-2";
             button.lastChild.data = " Sign out";
-            for (let i = menuItems.length - 1; i >= 0; i--) {
-                menuList.insertAdjacentElement('afterbegin', getMenuItem(menuItems[i].title, menuItems[i].xLink));
+            if (isLogin) {
+                for (let i = menuItems.length - 1; i >= 0; i--) {
+                    menuList.insertAdjacentElement('afterbegin', getMenuItem(menuItems[i].title, menuItems[i].xLink));
+                }
             }
             showMortgageStats(mortgagesData);
+            showAlert('success', "Fetch Success", `${new Date().toLocaleTimeString('en-US')} - successfully updated data from server.`);
+        }).catch(error => {
+            button.className = "btn btn-link align-items-center gap-2";
+            button.lastChild.data = " Sign out";
+            showAlert('warning', "Fetch Error", `${new Date().toLocaleTimeString('en-US')} - ${error.message}`);
         });
 
     fetchRecentLeads()
@@ -223,32 +255,36 @@ function loadData() {
 }
 
 reloadDataButton.addEventListener('click', () => {
-    clearData();
-    loadData();
+    clearData(false);
+    loadData(false);
 });
 
 button.addEventListener('click', () => {
     if (userSignedIn) {
-        auth.signOut().then(() => {
-            dashboardView.hidden = true;
-            button.lastChild.data = " Sign in";
-            button.className = "btn btn-link align-items-center gap-2";
-        });
-        userSignedIn = false;
+        auth.signOut()
+            .then(() => {
+                dashboardView.hidden = true;
+                userSignedIn = false;
+                button.lastChild.data = " Sign in";
+                button.className = "btn btn-link align-items-center gap-2";
+                showAlert('success', "Logout Success", `${new Date().toLocaleTimeString('en-US')} - user logged out successfully`);
+            });
+        
         button.className = "btn btn-link align-items-center gap-2 disabled";
         reloadDataButton.className = "btn btn-link align-items-center gap-2 disabled";
-        clearData();
+        clearData(true);
     } else {
         auth.signInWithPopup(provider)
             .then((result) => {
                 button.className = "btn btn-link align-items-center gap-2";
-                reloadDataButton.className = "btn btn-link align-items-center gap-2";
-                loadData();
+                userSignedIn = true;
+                loadData(true);
+                showAlert('success', "Login Success", `${new Date().toLocaleTimeString('en-US')} - ${result.user.email} logged in successfully`);
             }).catch((error) => {
                 button.className = "btn btn-link align-items-center gap-2";
                 showAlert('warning', "Login Failed", error.message);
             });
-        userSignedIn = true;
         button.className = "btn btn-link align-items-center gap-2 disabled";
+        clearData(false);
     }
 });
