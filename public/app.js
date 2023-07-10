@@ -288,12 +288,14 @@ button.addEventListener('click', () => {
 
         button.className = "btn btn-link align-items-center gap-2 disabled";
         reloadDataButton.className = "btn btn-link align-items-center gap-2 disabled";
+        clearMessagesView();
         clearData(true);
     } else {
         auth.signInWithPopup(provider)
             .then((result) => {
                 button.className = "btn btn-link align-items-center gap-2";
                 userSignedIn = true;
+                showDashboardView();
                 loadData(true);
                 showAlert('success', "Login Success", `${new Date().toLocaleTimeString('en-US')} - ${result.user.email} logged in successfully`);
             }).catch((error) => {
@@ -389,6 +391,7 @@ function setUserMessagesListener(userId, user) {
             if (messagesData.length > 0) {
                 messagesData.sort((a, b) => a.messageData.sent.seconds > b.messageData.sent.seconds);
                 showUserMessages(messagesData, user);
+                messagesList.scrollTop = messagesList.scrollHeight;
             } else {
                 messagesList.innerHTML = `
                 <div class="alert alert-info" role="alert">
@@ -416,6 +419,7 @@ function setUserMessagesListener(userId, user) {
             if (messagesData.length > 0) {
                 messagesData.sort((a, b) => a.messageData.sent.seconds > b.messageData.sent.seconds);
                 showUserMessages(messagesData, user);
+                messagesList.scrollTop = messagesList.scrollHeight;
             } else {
                 messagesList.innerHTML = `
                 <div class="alert alert-info" role="alert">
