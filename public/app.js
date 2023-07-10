@@ -347,6 +347,7 @@ function showUserDetails(user) {
  * @param {string} messageText 
  */
 function sendMessage(userId) {
+    console.log("sendingto : " + userId);
     let messageTextField = document.getElementById("messageTextField");
 
     if (messageTextField.value.length == 0) {
@@ -365,12 +366,22 @@ function sendMessage(userId) {
     messageTextField.value = "";
 }
 
+function changeSendButtonDestination(userId) {
+    document.getElementById("sendMessageButton").remove();
+    
+    let newButton = document.createElement('button');
+    newButton.className = "btn btn-primary"; newButton.id = "sendMessageButton";
+    newButton.addEventListener('click', () => { sendMessage(userId) });
+    newButton.innerText = "Send";
+    document.getElementById("sendMessageView").insertAdjacentElement('beforeend', newButton);
+}
+
 function setUserMessagesListener(userId, user) { 
     let clientMessages = [];
     let companyMessages = [];
     let messagesData = [];
-    
-    document.getElementById("sendMessageButton").addEventListener('click', () => { sendMessage(userId,) })
+
+    changeSendButtonDestination(userId);
 
     var clientMessagesListener = db
         .collection("users")
@@ -379,7 +390,6 @@ function setUserMessagesListener(userId, user) {
         .onSnapshot(querySnapshot => {
             clientMessages = [];
             querySnapshot.forEach(doc => {
-                console.log(doc.data());
                 clientMessages.push({
                     messageData: doc.data(),
                     isClient: true

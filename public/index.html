@@ -112,7 +112,7 @@
     .chat-messages {
       display: flex;
       flex-direction: column;
-      max-height: 800px;
+      height: 600px;
       overflow-y: scroll
     }
 
@@ -349,7 +349,7 @@
                 </div>
 
                 <div class="flex-grow-0 py-3 px-4 border-top">
-                  <div class="input-group">
+                  <div class="input-group" id="sendMessageView">
                     <input type="text" class="form-control text-wrap" id="messageTextField" placeholder="Type your message">
                     <button class="btn btn-primary" id="sendMessageButton">Send</button>
                   </div>
