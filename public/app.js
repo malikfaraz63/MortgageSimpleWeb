@@ -152,10 +152,11 @@ function showRecentLeads(leadsData) {
     }
 }
 
-function getMenuItem(title, xLink) {
-    let listItem = document.createElement('li', { class: "nav-item" });
+function getMenuItem(title, id, xLink) {
+    let listItem = document.createElement('li');
+    listItem.className = "nav-item";
     listItem.innerHTML = `
-    <button class="btn btn-link align-items-center gap-2">
+    <button class="btn btn-link align-items-center gap-2" id="${id}">
         <svg class="bi"><use xlink:href="#${xLink}"/></svg>
         ${title}
     </button>
@@ -166,14 +167,17 @@ function getMenuItem(title, xLink) {
 let menuItems = [
     {
         title: "Dashboard",
+        id: "dashboardButton",
         xLink: "house-fill"
     },
     {
-        title: "Reports",
-        xLink: "graph-up"
+        title: "Chat",
+        id: "chatButton",
+        xLink: "chat"
     },
     {
         title: "Settings",
+        id: "settingsButton",
         xLink: "gear-wide-connected"
     }
 ]
@@ -181,11 +185,21 @@ let menuItems = [
 var provider = new firebase.auth.GoogleAuthProvider();
 
 const menuList = document.getElementById("menuList");
+const titleLabel = document.getElementById("titleLabel");
 const dashboardView = document.getElementById("dashboardView");
+const messagesView = document.getElementById("messagesView");
 const button = document.getElementById("signInButton");
 const reloadDataButton = document.getElementById("reloadDataButton");
+const messagesList = document.getElementById("messagesList");
+const usersList = document.getElementById("usersList");
+
+messagesView.hidden = true;
 dashboardView.hidden = true;
 
+function clearAlerts() {
+    console.log("EE");
+    document.getElementById("alertView").innerHTML = "";
+}
 /**
  * 
  * @param {string} type 
@@ -214,7 +228,7 @@ function showAlert(type, title, message) {
  */
 function clearData(isLogout) {
     document.getElementById("leadsTable").innerHTML = "";
-    document.getElementById("alertView").innerHTML = "";
+    clearAlerts();
     if (myChart) {
         myChart.destroy();
     }
@@ -239,9 +253,11 @@ function loadData(isLogin) {
             button.lastChild.data = " Sign out";
             if (isLogin) {
                 for (let i = menuItems.length - 1; i >= 0; i--) {
-                    menuList.insertAdjacentElement('afterbegin', getMenuItem(menuItems[i].title, menuItems[i].xLink));
+                    menuList.insertAdjacentElement('afterbegin', getMenuItem(menuItems[i].title, menuItems[i].id, menuItems[i].xLink));
                 }
             }
+            document.getElementById("dashboardButton").addEventListener('click', showDashboardView);
+            document.getElementById("chatButton").addEventListener('click', showMessagesView);
             showMortgageStats(mortgagesData);
             showAlert('success', "Fetch Success", `${new Date().toLocaleTimeString('en-US')} - successfully updated data from server.`);
         }).catch(error => {
@@ -269,7 +285,7 @@ button.addEventListener('click', () => {
                 button.className = "btn btn-link align-items-center gap-2";
                 showAlert('success', "Logout Success", `${new Date().toLocaleTimeString('en-US')} - user logged out successfully`);
             });
-        
+
         button.className = "btn btn-link align-items-center gap-2 disabled";
         reloadDataButton.className = "btn btn-link align-items-center gap-2 disabled";
         clearData(true);
@@ -288,3 +304,201 @@ button.addEventListener('click', () => {
         clearData(false);
     }
 });
+
+/**
+ * 
+ * @param {*} message 
+ * @param {boolean} isClient 
+ */
+function showUserMessage(message, user, isClient) {
+    let side = isClient ? "left" : "right";
+    let userMessage = document.createElement('div');
+    userMessage.className = `chat-message-${side} pb-4`;
+    userMessage.innerHTML = `
+    <div>
+        <img src="${isClient ? user.photoURL : "companyAvatar.png"}" class="rounded-circle mr-1" width="40" height="40">
+        <div class="text-muted small text-nowrap mt-2">${message.sent.toDate().toLocaleTimeString('en-US')}</div>
+    </div>
+    <div class="flex-shrink-1 bg-light rounded py-2 px-3 ml-3">
+        <div class="font-weight-bold mb-1">${isClient ? user.name : "You"}</div>
+        ${message.message}
+    </div>
+    `;
+    
+    messagesList.insertAdjacentElement('beforeend', userMessage);
+}
+
+function showUserMessages(messagesData, user) {
+    // FIXME: add cell reuse maybe?
+    messagesList.innerHTML = "";
+    messagesData.forEach(doc => { showUserMessage(doc.messageData, user, doc.isClient) });
+}
+
+function showUserDetails(user) {
+    document.getElementById("messageUserTitle").innerHTML = `<strong>${user.name}</strong>`
+    document.getElementById("messageUserPhoto").src = user.photoURL;
+}
+
+/**
+ * 
+ * @param {string} userId 
+ * @param {string} messageText 
+ */
+function sendMessage(userId) {
+    let messageTextField = document.getElementById("messageTextField");
+
+    if (messageTextField.value.length == 0) {
+        return;
+    }
+
+    db
+        .collection("users")
+        .doc(userId)
+        .collection("companyMessages")
+        .add({message: messageTextField.value, sent: new Date(), read: false})
+        .catch(error => {
+            showAlert('warning', "Message Send Error", `${new Date().toLocaleTimeString('en-US')} - ${error.message}`);
+        });
+    
+    messageTextField.value = "";
+}
+
+function setUserMessagesListener(userId, user) { 
+    let clientMessages = [];
+    let companyMessages = [];
+    let messagesData = [];
+    
+    document.getElementById("sendMessageButton").addEventListener('click', () => { sendMessage(userId,) })
+
+    var clientMessagesListener = db
+        .collection("users")
+        .doc(userId)
+        .collection("clientMessages")
+        .onSnapshot(querySnapshot => {
+            clientMessages = [];
+            querySnapshot.forEach(doc => {
+                console.log(doc.data());
+                clientMessages.push({
+                    messageData: doc.data(),
+                    isClient: true
+                });
+            });
+
+            showUserDetails(user);
+            messagesData = clientMessages.concat(companyMessages);
+            if (messagesData.length > 0) {
+                messagesData.sort((a, b) => a.messageData.sent.seconds > b.messageData.sent.seconds);
+                showUserMessages(messagesData, user);
+            } else {
+                messagesList.innerHTML = `
+                <div class="alert alert-info" role="alert">
+                    No conversations were found.
+                </div>
+                `;
+            }
+        });
+
+    var companyMessagesListener = db
+        .collection("users")
+        .doc(userId)
+        .collection("companyMessages")
+        .onSnapshot(querySnapshot => {
+            companyMessages = [];
+            querySnapshot.forEach(doc => {
+                companyMessages.push({
+                    messageData: doc.data(),
+                    isClient: false
+                });
+            });
+
+            showUserDetails(user);
+            messagesData = clientMessages.concat(companyMessages);
+            if (messagesData.length > 0) {
+                messagesData.sort((a, b) => a.messageData.sent.seconds > b.messageData.sent.seconds);
+                showUserMessages(messagesData, user);
+            } else {
+                messagesList.innerHTML = `
+                <div class="alert alert-info" role="alert">
+                    No conversations were found.
+                </div>
+                `;
+            }
+        });
+}
+
+/**
+ * 
+ * @param {string} name 
+ * @param {number} unreadMessages 
+ * @param {string} email
+ * @param {string} photoURL
+ */
+function getUserButton(documentID, user) {
+    const userButton = document.createElement('a');
+    userButton.className = "userButton list-group-item list-group-item-action border-0";
+    
+    /* when unread messages count is being updated...
+    if (unreadMessages > 0) {
+        userButton.innerHTML += `
+            <div class="badge bg-success float-right">${user.unread}</div>`;
+    }
+    */
+    userButton.innerHTML += `
+        <div class="d-flex align-items-start">
+            <img src="${user.photoURL}" class="rounded-circle mr-1" width="40" height="40">
+            <div class="flex-grow-1 ml-3">
+                ${user.name}
+                <div class="small"><span class="fas fa-circle chat-online"></span> ${user.email}</div>
+            </div>
+        </div>
+    </a>
+    `;
+    userButton.addEventListener('click', () => { 
+        try {
+            companyMessagesListener();
+            clientMessagesListener();
+        } catch {}
+        setUserMessagesListener(extractUserId(documentID), user);
+    });
+    return userButton;
+}
+
+function clearMessagesView() {
+    messagesList.innerHTML = "";
+    document.getElementById("messageUserTitle").innerHTML = "<strong>No user selected</strong>";
+    document.getElementById("messageUserPhoto").src = "";
+    const userButtons = document.getElementsByClassName("userButton");
+    while (userButtons.length > 0) {
+        userButtons[0].remove();
+    }
+}
+
+function showDashboardView() {
+    messagesView.hidden = true;
+    dashboardView.hidden = false;
+    reloadDataButton.hidden = false;
+    clearAlerts();
+    titleLabel.innerText = "Dashboard";
+    clearMessagesView();
+}
+
+function showMessagesView() {
+    messagesView.hidden = false;
+    dashboardView.hidden = true;
+    reloadDataButton.hidden = true;
+    clearAlerts();
+    titleLabel.innerText = "Messages";
+    clearMessagesView();
+    db.collection("users")
+        .get()
+        .then(querySnapshot => {
+            querySnapshot.forEach(doc => {
+                let userButton = getUserButton(doc.ref.path, doc.data());
+                usersList.insertAdjacentElement('beforeend', userButton);
+            })
+            let hr = document.createElement('hr');
+            hr.className = "d-block d-lg-none mt-1 mb-0";
+            usersList.insertAdjacentElement('beforeend', hr);
+            showAlert('success', "Fetch Success", `${new Date().toLocaleTimeString()} - Users fetched successfully.`);
+        });
+}
