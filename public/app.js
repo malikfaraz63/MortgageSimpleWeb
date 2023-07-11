@@ -321,7 +321,7 @@ function showUserMessage(message, user, isClient) {
         <img src="${isClient ? user.photoURL : "companyAvatar.png"}" class="rounded-circle mr-1" width="40" height="40">
         <div class="text-muted small text-nowrap mt-2">${message.sent.toDate().toLocaleTimeString('en-US')}</div>
     </div>
-    <div class="flex-shrink-1 bg-light rounded py-2 px-3 ml-3">
+    <div class="flex-shrink-1 bg-light rounded py-2 px-3 mx-3">
         <div class="font-weight-bold mb-1">${isClient ? user.name : "You"}</div>
         ${message.message}
     </div>
@@ -368,6 +368,18 @@ function sendMessage(userId) {
 
 function changeSendButtonDestination(userId) {
     document.getElementById("sendMessageButton").remove();
+    document.getElementById("messageTextField").remove();
+
+    let messageTextField = document.createElement('input');
+    messageTextField.className = "form-control text-wrap"; messageTextField.id = "messageTextField"; messageTextField.placeholder = "Type your message";
+    messageTextField.addEventListener('keydown', (event) => {
+        if (event.code == "Enter") {
+            sendMessage(userId); 
+        } else {
+            return;
+        }
+    });
+    document.getElementById("sendMessageView").insertAdjacentElement('beforeend', messageTextField);
     
     let newButton = document.createElement('button');
     newButton.className = "btn btn-primary"; newButton.id = "sendMessageButton";
