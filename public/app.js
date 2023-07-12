@@ -196,8 +196,10 @@ const usersList = document.getElementById("usersList");
 messagesView.hidden = true;
 dashboardView.hidden = true;
 
+let companyMessagesListener;
+let clientMessagesListener;
+
 function clearAlerts() {
-    console.log("EE");
     document.getElementById("alertView").innerHTML = "";
 }
 /**
@@ -363,6 +365,35 @@ function sendMessage(userId) {
             showAlert('warning', "Message Send Error", `${new Date().toLocaleTimeString('en-US')} - ${error.message}`);
         });
     
+    db
+        .collection("users")
+        .doc(userId)
+        .update({ clientUnread: 0 })
+        .catch(error => {
+            showAlert('warning', "Message Send Error", `${new Date().toLocaleTimeString('en-US')} - ${error.message}`);
+        });
+    
+    let unreadMessageIds = [];
+    let clientMessagesRef = db
+        .collection("users")
+        .doc(userId)
+        .collection("clientMessages");
+    
+    clientMessagesRef
+        .where("read", "==", false)
+        .get()
+        .then(querySnapshot => {
+            querySnapshot.forEach(doc => { 
+                unreadMessageIds.push(doc.id); 
+            });
+
+            for (const unreadMessageId of unreadMessageIds) {
+                clientMessagesRef
+                    .doc(unreadMessageId)
+                    .update({ "read": true })
+            }
+        });
+    
     messageTextField.value = "";
 }
 
@@ -395,7 +426,7 @@ function setUserMessagesListener(userId, user) {
 
     changeSendButtonDestination(userId);
 
-    var clientMessagesListener = db
+    clientMessagesListener = db
         .collection("users")
         .doc(userId)
         .collection("clientMessages")
@@ -423,7 +454,7 @@ function setUserMessagesListener(userId, user) {
             }
         });
 
-    var companyMessagesListener = db
+    companyMessagesListener = db
         .collection("users")
         .doc(userId)
         .collection("companyMessages")
@@ -452,6 +483,21 @@ function setUserMessagesListener(userId, user) {
         });
 }
 
+function setNotificationsListener(userId) {
+    db
+        .collection("users")
+        .doc(userId)
+        .onSnapshot(querySnapshot => {
+            let count = querySnapshot.data().clientUnread;
+            if (count > 0) {
+                document.getElementById(`notifications-${userId}`).innerHTML = `${count}`;
+                document.getElementById(`notifications-${userId}`).hidden = false;
+            } else {
+                document.getElementById(`notifications-${userId}`).hidden = true;
+            }
+        });
+}
+
 /**
  * 
  * @param {string} name 
@@ -462,13 +508,15 @@ function setUserMessagesListener(userId, user) {
 function getUserButton(documentID, user) {
     const userButton = document.createElement('a');
     userButton.className = "userButton list-group-item list-group-item-action border-0";
-    
-    /* when unread messages count is being updated...
-    if (unreadMessages > 0) {
+    let userId = extractUserId(documentID);
+    if (user.clientUnread > 0) {
         userButton.innerHTML += `
-            <div class="badge bg-success float-right">${user.unread}</div>`;
+            <div class="badge bg-success float-right" id="notifications-${userId}">${user.clientUnread}</div>`;
+    } else {
+        userButton.innerHTML += `
+            <div class="badge bg-success float-right" id="notifications-${userId}" hidden>0</div>`;
     }
-    */
+    
     userButton.innerHTML += `
         <div class="d-flex align-items-start">
             <img src="${user.photoURL}" class="rounded-circle mr-1" width="40" height="40">
@@ -479,20 +527,26 @@ function getUserButton(documentID, user) {
         </div>
     </a>
     `;
+
+    setNotificationsListener(userId);
+
     userButton.addEventListener('click', () => { 
         try {
             companyMessagesListener();
             clientMessagesListener();
-        } catch {}
+        } catch(error) {
+            console.log(error);
+        }
         setUserMessagesListener(extractUserId(documentID), user);
     });
+
     return userButton;
 }
 
 function clearMessagesView() {
     messagesList.innerHTML = "";
     document.getElementById("messageUserTitle").innerHTML = "<strong>No user selected</strong>";
-    document.getElementById("messageUserPhoto").src = "";
+    document.getElementById("messageUserPhoto").src = "companyAvatar.png";
     const userButtons = document.getElementsByClassName("userButton");
     while (userButtons.length > 0) {
         userButtons[0].remove();
